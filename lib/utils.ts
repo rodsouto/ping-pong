@@ -78,7 +78,7 @@ export async function getPingMap(latestBlock: bigint) {
 }
 
 async function sendPong(pingHash: `0x${string}`) {
-  console.log("sending pong...");
+  console.log(`sending pong for ping ${pingHash}...`);
 
   const { request } = await walletClient.simulateContract({
     address: process.env.PING_PONG_CONTRACT_ADDRESS as `0x${string}`,
@@ -90,7 +90,7 @@ async function sendPong(pingHash: `0x${string}`) {
   });
   const pongHash = await walletClient.writeContract(request);
 
-  console.log(`submitted pong with tx ${pongHash} for ping ${pingHash}`);
+  console.log(`submitted pong with tx ${pongHash} for ping ${pingHash}...`);
 
   await savePong(pingHash, pongHash);
 
@@ -100,6 +100,7 @@ async function sendPong(pingHash: `0x${string}`) {
   });
 
   await setPongStatus(pongHash, true);
+  console.log("pong confirmed");
 }
 
 async function speedTx(pingHash: `0x${string}`) {
@@ -147,7 +148,6 @@ const sleep = (delay: number) =>
 export async function pongLoop(pingHash: `0x${string}`, pongEvent?: Pong) {
   while (true) {
     try {
-      console.log("Pong:", pongEvent);
       await executePong(pingHash, pongEvent);
       break;
     } catch (error: any) {
@@ -159,6 +159,8 @@ export async function pongLoop(pingHash: `0x${string}`, pongEvent?: Pong) {
 }
 
 export async function executePong(pingHash: `0x${string}`, pongEvent?: Pong) {
+  console.log("=================================");
+  console.log("Ping", pingHash, "Pong:", pongEvent);
   if (pongEvent === undefined) {
     await sendPong(pingHash);
     return;

@@ -6,6 +6,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.38.4",
     "dotenv": "^16.3.1",
+    "queue": "^6.0.2",
     "viem": "^1.18.4"
   },
   "devDependencies": {
