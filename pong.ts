@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { formatEther } from "viem";
 import { walletClient } from "./lib/viem";
-import { pongLoop, getPingMap } from "./lib/utils";
+import { pongLoop, getPingMap, getPendingPings } from "./lib/utils";
 import { PING_EVENT } from "./lib/logs";
 import Queue from "queue";
 
@@ -19,32 +19,23 @@ import Queue from "queue";
   const pingMap = await getPingMap(latestBlock);
 
   // get pings without a pong
-  const pendingPings = Array.from(pingMap).filter((entry) => {
-    const [pingHash, pongEvent] = entry;
-    if (pongEvent?.mined) {
-      // pong already sent
-      return false;
-    }
-
-    return true;
-  });
+  const pendingPings = getPendingPings(pingMap);
 
   console.log(
     `Found ${pingMap.size} pings, ${pendingPings.length} pings pending`
   );
 
-  // task queue
+  // using the task queue the pings are executed in order,
+  // and it only tries to execute the next pong once the current one has been confirmed
+  // the bot will never have more than 1 pending tx
   const q = new Queue({
     concurrency: 1,
     results: [],
   });
 
   // initialize the queue with the pending pings
-  pendingPings.forEach((entry) => {
-    q.push(() => {
-      const [pingHash, pongEvent] = entry;
-      return pongLoop(pingHash, pongEvent);
-    });
+  pendingPings.forEach((pingHash) => {
+    q.push(() => pongLoop(pingHash));
   });
 
   walletClient.watchEvent({

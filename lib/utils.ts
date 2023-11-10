@@ -1,6 +1,6 @@
 import { TransactionNotFoundError, parseGwei } from "viem";
 import { getAllEvents } from "./logs";
-import { Pong, getPongs, savePong, setPongStatus } from "./supabase";
+import { Pong, getPong, getPongs, savePong, setPongStatus } from "./supabase";
 import { walletClient } from "./viem";
 
 export const PING_PONG_ABI = [
@@ -44,7 +44,9 @@ export const PING_PONG_ABI = [
 
 const BLOCK_RANGE = 500000n;
 
-export async function getPingMap(latestBlock: bigint) {
+export async function getPingMap(
+  latestBlock: bigint
+): Promise<Map<`0x${string}`, Pong | undefined>> {
   const pingEvents = await getAllEvents(
     "ping",
     BigInt(process.env.STARTING_BLOCK!),
@@ -77,6 +79,19 @@ export async function getPingMap(latestBlock: bigint) {
   return pingMap;
 }
 
+export function getPendingPings(
+  pingMap: Map<`0x${string}`, Pong | undefined>
+): Array<`0x${string}`> {
+  return Array.from(pingMap).reduce((acc, entry) => {
+    const [pingHash, pongEvent] = entry;
+    if (pongEvent?.mined !== true) {
+      acc.push(pingHash);
+    }
+
+    return acc;
+  }, [] as Array<`0x${string}`>);
+}
+
 async function sendPong(pingHash: `0x${string}`) {
   console.log(`sending pong for ping ${pingHash}...`);
 
@@ -96,10 +111,10 @@ async function sendPong(pingHash: `0x${string}`) {
 
   await walletClient.waitForTransactionReceipt({
     hash: pongHash,
-    timeout: 60000,
   });
 
   await setPongStatus(pongHash, true);
+
   console.log("pong confirmed");
 }
 
@@ -133,22 +148,22 @@ async function speedTx(pingHash: `0x${string}`) {
 
   const pongHash = await walletClient.writeContract(request);
 
-  console.log(`speeded pong with tx ${pongHash}`);
-
   await savePong(pingHash, pongHash);
 
   await walletClient.waitForTransactionReceipt({ hash: pongHash });
 
   await setPongStatus(pongHash, true);
+
+  console.log("pong confirmed");
 }
 
 const sleep = (delay: number) =>
   new Promise((resolve) => setTimeout(resolve, delay));
 
-export async function pongLoop(pingHash: `0x${string}`, pongEvent?: Pong) {
+export async function pongLoop(pingHash: `0x${string}`) {
   while (true) {
     try {
-      await executePong(pingHash, pongEvent);
+      await executePong(pingHash);
       break;
     } catch (error: any) {
       console.log("Pong error, waiting to retry...", error.shortMessage);
@@ -158,7 +173,9 @@ export async function pongLoop(pingHash: `0x${string}`, pongEvent?: Pong) {
   }
 }
 
-export async function executePong(pingHash: `0x${string}`, pongEvent?: Pong) {
+export async function executePong(pingHash: `0x${string}`) {
+  const pongEvent = await getPong(pingHash);
+
   console.log("=================================");
   console.log("Ping", pingHash, "Pong:", pongEvent);
   if (pongEvent === undefined) {
